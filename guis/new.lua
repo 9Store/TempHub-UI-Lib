@@ -4435,11 +4435,16 @@ components = {
 		end
 		
 		discord.MouseButton1Click:Connect(function()
-			local code = (type(shared.TempHubDiscordCode) == 'string' and shared.TempHubDiscordCode)
+			-- Prefer host script handler (safe); else stock Vape clipboard + RPC only
+			if type(shared.TempHubOpenDiscord) == 'function' then
+				pcall(shared.TempHubOpenDiscord)
+				return
+			end
+
+			local code = (type(shared.TempHubDiscordCode) == 'string' and shared.TempHubDiscordCode ~= '' and shared.TempHubDiscordCode)
 				or 'dQg8xY2xdB'
 			local inviteUrl = 'https://discord.com/invite/' .. code
 
-			-- Stock Vape behavior: clipboard + Discord RPC opens the invite in Discord app
 			pcall(function()
 				if setclipboard then
 					setclipboard(inviteUrl)
@@ -4449,54 +4454,36 @@ components = {
 			end)
 
 			task.spawn(function()
-				local body = httpService:JSONEncode({
-					nonce = httpService:GenerateGUID(false),
-					args = {
-						invite = { code = code },
-						code = code
-					},
-					cmd = 'INVITE_BROWSER'
-				})
-				local ports = {}
-				for p = 6463, 6473 do
-					ports[#ports + 1] = p
+				local ok, body = pcall(function()
+					return httpService:JSONEncode({
+						nonce = httpService:GenerateGUID(false),
+						args = {
+							invite = { code = code },
+							code = code
+						},
+						cmd = 'INVITE_BROWSER'
+					})
+				end)
+				if not ok or type(body) ~= 'string' or type(request) ~= 'function' then
+					return
 				end
+				-- Stock Vape: 14 ports only — no openurl (crashes some clients)
 				for i = 1, 14 do
-					ports[#ports + 1] = 6453 + i
-				end
-				for _, port in ipairs(ports) do
 					task.spawn(function()
-						pcall(function()
-							request({
-								Method = 'POST',
-								Url = 'http://127.0.0.1:' .. port .. '/rpc?v=1',
-								Headers = {
-									['Content-Type'] = 'application/json',
-									Origin = 'https://discord.com'
-								},
-								Body = body
-							})
-						end)
+						pcall(request, {
+							Method = 'POST',
+							Url = 'http://127.0.0.1:64' .. (53 + i) .. '/rpc?v=1',
+							Headers = {
+								['Content-Type'] = 'application/json',
+								Origin = 'https://discord.com'
+							},
+							Body = body
+						})
 					end)
 				end
 			end)
 
-			task.spawn(function()
-				for _, target in ipairs({
-					inviteUrl,
-					'https://discord.gg/' .. code,
-					'discord://-/invite/' .. code,
-				}) do
-					if openurl and pcall(openurl, target) then
-						break
-					end
-					if syn and syn.open_url and pcall(syn.open_url, target) then
-						break
-					end
-				end
-			end)
-
-			tooltip.Text = 'Opening Discord…'
+			tooltip.Text = 'Invite copied!'
 			task.delay(1.25, function()
 				tooltip.Text = 'Join Temp Hub Discord'
 			end)
