@@ -834,6 +834,21 @@ function vape:LoadGUI()
 	scarcitybanner.TextScaled = true
 	scarcitybanner.TextStrokeTransparency = 0.5
 	scarcitybanner.Parent = clickgui
+	local credit = Instance.new('TextLabel')
+	credit.AnchorPoint = Vector2.new(1, 1)
+	credit.BackgroundTransparency = 1
+	credit.FontFace = uipallet.Font
+	credit.Name = 'TempHubCredit'
+	credit.Position = UDim2.new(1, -12, 1, -10)
+	credit.Size = UDim2.fromOffset(380, 16)
+	credit.Text = 'thank you so much for this UI — credit 7GrandDadPGN'
+	credit.TextColor3 = Color3.new(1, 1, 1)
+	credit.TextSize = 11
+	credit.TextTransparency = 0.2 -- ~opacity 0.8
+	credit.TextXAlignment = Enum.TextXAlignment.Right
+	credit.TextYAlignment = Enum.TextYAlignment.Bottom
+	credit.ZIndex = 3
+	credit.Parent = clickgui
 	local modal = Instance.new('TextButton')
 	modal.BackgroundTransparency = 1
 	modal.Modal = true
@@ -4319,21 +4334,18 @@ components = {
 		addBlur(window)
 		addCorner(window)
 		addDragHandler(window)
-		local logo = Instance.new('ImageLabel')
+		local logo = Instance.new('TextLabel')
 		logo.BackgroundTransparency = 1
-		logo.Image = getvapeasset('newvape/assets/new/vapelogomini.png')
-		logo.ImageColor3 = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1)
+		logo.FontFace = uipallet.Font
 		logo.Name = 'TempHubLogo'
-		logo.Position = UDim2.fromOffset(12, 11)
-		logo.Size = UDim2.fromOffset(55, 16)
+		logo.Position = UDim2.fromOffset(11, 9)
+		logo.Size = UDim2.fromOffset(110, 20)
+		logo.Text = 'Temp Hub'
+		logo.TextColor3 = select(3, uipallet.Main:ToHSV()) > 0.5 and uipallet.Text or Color3.new(1, 1, 1)
+		logo.TextSize = 15
+		logo.TextXAlignment = Enum.TextXAlignment.Left
+		logo.TextYAlignment = Enum.TextYAlignment.Center
 		logo.Parent = window
-		local v4logo = Instance.new('ImageLabel')
-		v4logo.BackgroundTransparency = 1
-		v4logo.Image = getvapeasset('newvape/assets/new/v4mini.png')
-		v4logo.Name = 'HubLogo'
-		v4logo.Position = UDim2.new(1, -1, 0, 0)
-		v4logo.Size = UDim2.fromOffset(23, 16)
-		v4logo.Parent = logo
 		local children = Instance.new('Frame')
 		children.BackgroundTransparency = 1
 		children.Position = UDim2.fromOffset(0, 37)
@@ -4363,7 +4375,7 @@ components = {
 		discord.Position = UDim2.new(1, -56, 0, 11)
 		discord.Size = UDim2.fromOffset(16, 16)
 		discord.Parent = window
-		addTooltip(discord, 'Join discord')
+		addTooltip(discord, 'Join Temp Hub Discord')
 		local stroke = Instance.new('UIStroke')
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		stroke.Color = Color3.fromRGB(85, 85, 85)
@@ -4376,7 +4388,7 @@ components = {
 		component.Settings = settingspane
 		
 		function component:Color(hue, sat, val, isRainbow)
-			v4logo.ImageColor3 = Color3.fromHSV(hue, sat, val)
+			logo.TextColor3 = Color3.fromHSV(hue, sat, val)
 		
 			for _, button in self.Buttons do
 				if button.Enabled then
@@ -4423,22 +4435,41 @@ components = {
 		end
 		
 		discord.MouseButton1Click:Connect(function()
+			local code = (type(shared.TempHubDiscordCode) == 'string' and shared.TempHubDiscordCode)
+				or 'dQg8xY2xdB'
+			local inviteUrl = 'https://discord.com/invite/' .. code
+
+			-- Stock Vape behavior: clipboard + Discord RPC opens the invite in Discord app
+			pcall(function()
+				if setclipboard then
+					setclipboard(inviteUrl)
+				elseif toclipboard then
+					toclipboard(inviteUrl)
+				end
+			end)
+
 			task.spawn(function()
 				local body = httpService:JSONEncode({
 					nonce = httpService:GenerateGUID(false),
 					args = {
-						invite = {code = 'dQg8xY2xdB'},
-						code = 'dQg8xY2xdB'
+						invite = { code = code },
+						code = code
 					},
 					cmd = 'INVITE_BROWSER'
 				})
-		
+				local ports = {}
+				for p = 6463, 6473 do
+					ports[#ports + 1] = p
+				end
 				for i = 1, 14 do
+					ports[#ports + 1] = 6453 + i
+				end
+				for _, port in ipairs(ports) do
 					task.spawn(function()
 						pcall(function()
 							request({
 								Method = 'POST',
-								Url = 'http://127.0.0.1:64'..(53 + i)..'/rpc?v=1',
+								Url = 'http://127.0.0.1:' .. port .. '/rpc?v=1',
 								Headers = {
 									['Content-Type'] = 'application/json',
 									Origin = 'https://discord.com'
@@ -4449,10 +4480,25 @@ components = {
 					end)
 				end
 			end)
-		
+
 			task.spawn(function()
-				tooltip.Text = 'Copied!'
-				setclipboard('https://discord.gg/dQg8xY2xdB')
+				for _, target in ipairs({
+					inviteUrl,
+					'https://discord.gg/' .. code,
+					'discord://-/invite/' .. code,
+				}) do
+					if openurl and pcall(openurl, target) then
+						break
+					end
+					if syn and syn.open_url and pcall(syn.open_url, target) then
+						break
+					end
+				end
+			end)
+
+			tooltip.Text = 'Opening Discord…'
+			task.delay(1.25, function()
+				tooltip.Text = 'Join Temp Hub Discord'
 			end)
 		end)
 		
@@ -6414,7 +6460,21 @@ components = {
 		legiticon.Position = UDim2.fromOffset(8, 11)
 		legiticon.Size = UDim2.fromOffset(29, 16)
 		legiticon.Parent = search
-		listenProperty(vape.Categories.Main.Object.TempHubLogo.HubLogo, legiticon, 'ImageColor3', legiticon)
+		do
+			local hub = vape.Categories.Main.Object:FindFirstChild('TempHubLogo')
+			if hub then
+				local function syncLegit()
+					legiticon.ImageColor3 = hub:IsA('TextLabel') and hub.TextColor3
+						or (hub.ImageColor3 or Color3.new(1, 1, 1))
+				end
+				syncLegit()
+				if hub:IsA('TextLabel') then
+					hub:GetPropertyChangedSignal('TextColor3'):Connect(syncLegit)
+				elseif hub:IsA('ImageLabel') then
+					hub:GetPropertyChangedSignal('ImageColor3'):Connect(syncLegit)
+				end
+			end
+		end
 		local legitdivider = Instance.new('Frame')
 		legitdivider.BackgroundColor3 = color.Light(uipallet.Main, 0.14)
 		legitdivider.BorderSizePixel = 0
